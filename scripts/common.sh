@@ -23,24 +23,14 @@ tag_exists () {
 }
 
 get_git_branch () {
-# output the current branch, or HEAD/SHORT_SHA if we are on a
-# 'detached HEAD' - which will happen often in Jenkins
-# (except if the current short SHA matches master)
-# TODO: https://stackoverflow.com/questions/6059336/how-to-find-the-current-git-branch-in-detached-head-state
-#   git for-each-ref --format='%(objectname) %(refname:short)' refs/heads | awk "/^$(git rev-parse HEAD)/ {print \$2}"
+# output the current branch, handling detached HEAD as found in Jenkins
+# https://stackoverflow.com/questions/6059336/how-to-find-the-current-git-branch-in-detached-head-state
     local GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    local GIT_BRANCH_SSHA=$(git rev-parse --short HEAD)
-    # origin/master, not just master, as in a Jenkins workspace, local branches aren't mapped
-    # https://stackoverflow.com/questions/28355697/git-rev-parse-verify-says-fatal-needed-a-single-revision
-    local GIT_MASTER_SHA=$(git rev-parse --short origin/master)
 
-    # Jenkins will often checkout the SHA of a branch, check against master
+    # Jenkins will often checkout the SHA of a branch, (detached HEAD)
     if [[ "${GIT_BRANCH}" == 'HEAD' ]]; then
-      if [[ "${GIT_BRANCH_SSHA}" == "${GIT_MASTER_SHA}" ]]; then
-        echo "master"
-      else
-        echo "${GIT_BRANCH}/${GIT_BRANCH_SSHA}"
-      fi
+      # lookup branch against remotes, without network access (we may not have creds to talk to git remote)
+      echo "$(git branch --remote --verbose --no-abbrev --contains | sed -Ene 's/^[^\/]*\/([^\ ]+).*$/\1/p')"
     else
       echo "${GIT_BRANCH}"
     fi
